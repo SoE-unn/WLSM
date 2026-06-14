@@ -2460,9 +2460,9 @@ class CharacterLauncher:
 
         message = (
             "Orphan CustomAssets folders were found.\n\n"
-            f"CustomAssets folders to delete: {len(asset_only)}\n\n"
+            f"CustomAssets folders to move to the Recycle Bin: {len(asset_only)}\n\n"
             "MySaves and Collections files will not be deleted.\n\n"
-            "Do you want to permanently delete these CustomAssets folders?"
+            "Do you want to move these CustomAssets folders to the Recycle Bin?"
         )
 
         confirm = messagebox.askyesno("Clear Custom Assets", message)
@@ -2470,15 +2470,15 @@ class CharacterLauncher:
         if not confirm:
             return
 
-        deleted_asset_folders = 0
+        moved_asset_folders = 0
 
         try:
             for name in asset_only:
                 assets_folder = CUSTOMASSETS_PATH / name
 
                 if assets_folder.exists():
-                    shutil.rmtree(assets_folder)
-                    deleted_asset_folders += 1
+                    self.send_to_recycle_bin(assets_folder)
+                    moved_asset_folders += 1
 
                 self.selected.discard(name)
 
@@ -2488,9 +2488,9 @@ class CharacterLauncher:
             messagebox.showinfo(
                 "Cleanup complete",
                 (
-                    "Orphan CustomAssets folders removed!\n\n"
+                    "Orphan CustomAssets folders moved to the Recycle Bin!\n\n"
                     "MySaves and Collections files were preserved.\n"
-                    f"Folders removed from CustomAssets: {deleted_asset_folders}"
+                    f"Folders moved from CustomAssets: {moved_asset_folders}"
                 ),
             )
 
