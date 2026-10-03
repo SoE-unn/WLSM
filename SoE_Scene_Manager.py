@@ -1319,18 +1319,12 @@ class CharacterLauncher:
         if not self.save_folder_exists() or not MYSAVES_PATH.exists():
             return names
 
-        for map_level in SCENE_MAPS:
-            map_folder = MYSAVES_PATH / map_level
-
-            if not map_folder.exists() or not map_folder.is_dir():
+        for file_path in MYSAVES_PATH.rglob("*.json"):
+            if self.is_hairfix_manifest(file_path):
                 continue
 
-            for file_path in map_folder.iterdir():
-                if self.is_hairfix_manifest(file_path):
-                    continue
-
-                if file_path.is_file() and file_path.suffix.casefold() in {".json", ".png"}:
-                    names.add(file_path.stem)
+            if file_path.is_file():
+                names.add(file_path.stem)
 
         return names
 
@@ -1344,13 +1338,31 @@ class CharacterLauncher:
             if self.is_hairfix_manifest(file_path):
                 continue
 
-            if file_path.is_file() and file_path.suffix.casefold() in {".json", ".png"}:
+            if file_path.is_file() and file_path.suffix.casefold() == ".json":
                 names.add(file_path.stem)
 
         return names
 
     def get_save_names_with_assets(self):
         return self.get_scene_save_names() | self.get_collection_names()
+
+    def get_orphan_scene_preview_files(self):
+        preview_files = []
+
+        if not self.save_folder_exists() or not MYSAVES_PATH.exists():
+            return preview_files
+
+        for file_path in MYSAVES_PATH.rglob("*.png"):
+            if not file_path.is_file() or self.is_hairfix_manifest(file_path):
+                continue
+
+            if not file_path.with_suffix(".json").exists():
+                preview_files.append(file_path)
+
+        return sorted(
+            preview_files,
+            key=lambda item: (item.parent.name.casefold(), item.stem.casefold()),
+        )
 
     def get_customasset_names(self):
         names = set()
@@ -2451,18 +2463,20 @@ class CharacterLauncher:
 
         save_names = self.get_save_names_with_assets()
         asset_names = self.get_customasset_names()
+        orphan_preview_files = self.get_orphan_scene_preview_files()
 
         asset_only = sorted(asset_names - save_names, key=str.lower)
 
-        if not asset_only:
-            messagebox.showinfo("Checkup complete", "No orphan CustomAssets folders found.")
+        if not asset_only and not orphan_preview_files:
+            messagebox.showinfo("Checkup complete", "No orphan CustomAssets folders or preview files found.")
             return
 
         message = (
-            "Orphan CustomAssets folders were found.\n\n"
-            f"CustomAssets folders to move to the Recycle Bin: {len(asset_only)}\n\n"
-            "MySaves and Collections files will not be deleted.\n\n"
-            "Do you want to move these CustomAssets folders to the Recycle Bin?"
+            "Orphan scene files were found.\n\n"
+            f"CustomAssets folders to move to the Recycle Bin: {len(asset_only)}\n"
+            f"MySaves preview files to move to the Recycle Bin: {len(orphan_preview_files)}\n\n"
+            "Scene .json files and Collections files will not be deleted.\n\n"
+            "Do you want to move these orphan files to the Recycle Bin?"
         )
 
         confirm = messagebox.askyesno("Clear Custom Assets", message)
@@ -2471,6 +2485,7 @@ class CharacterLauncher:
             return
 
         moved_asset_folders = 0
+        moved_preview_files = 0
 
         try:
             for name in asset_only:
@@ -2482,15 +2497,21 @@ class CharacterLauncher:
 
                 self.selected.discard(name)
 
+            for preview_file in orphan_preview_files:
+                if preview_file.exists():
+                    self.send_to_recycle_bin(preview_file)
+                    moved_preview_files += 1
+
             self.image_cache.clear()
             self.refresh_characters()
 
             messagebox.showinfo(
                 "Cleanup complete",
                 (
-                    "Orphan CustomAssets folders moved to the Recycle Bin!\n\n"
-                    "MySaves and Collections files were preserved.\n"
-                    f"Folders moved from CustomAssets: {moved_asset_folders}"
+                    "Orphan scene files moved to the Recycle Bin!\n\n"
+                    "Scene .json files and Collections files were preserved.\n"
+                    f"Folders moved from CustomAssets: {moved_asset_folders}\n"
+                    f"Preview files moved from MySaves: {moved_preview_files}"
                 ),
             )
 
